@@ -1,7 +1,7 @@
 use std::env;
 use std::error::Error;
 use std::fs::File;
-use std::io::SeekFrom;
+use std::io;
 use std::io::prelude::*;
 use std::process;
 
@@ -15,7 +15,7 @@ enum VarLenInt {
     Hex(String),
 }
 
-fn parse_config(args: &[String]) -> Result<(&String, &String), String> {
+fn parse_args(args: &[String]) -> Result<(&String, &String), String> {
     if args.len() != 3 {
         let msg = format!(
             "Invalid argument count.\nUsage: {} <fpath> <byte offset>",
@@ -78,26 +78,15 @@ fn vec_to_int(buf: Vec<u8>) -> VarLenInt {
     ret
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-    let (fpath, offset_str) = parse_config(&args).unwrap_or_else(|err| {
-        eprintln!("{err}");
-        process::exit(1);
-    });
-
-    let offset = offset_str
-        .parse::<u64>()
-        .expect("Offset should be an integer.");
-
-    let mut f = File::open(fpath)?;
+fn scan_from_file(mut f: File, offset: u64) -> io::Result<Vec<u8>> {
     let mut readbuf: Vec<u8> = vec![0; 8];
     let mut buf: Vec<u8> = Vec::new();
-
     let mut n_bytes: usize = 0;
 
+    // CHECK/TODO: catch out-of-bounds file read when starting
+
     loop {
-        // CHECK: error-handling?
-        f.seek(SeekFrom::Start(offset + n_bytes as u64))?;
+        f.seek(io::SeekFrom::Start(offset + n_bytes as u64))?;
 
         let bytes_read = f.read(&mut readbuf)?;
         let mut local_n_bytes = 0;
@@ -126,7 +115,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         break;
     }
 
+    Ok(buf)
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let args: Vec<String> = env::args().collect();
+    let (fpath, offset_str) = parse_args(&args).unwrap_or_else(|err| {
+        eprintln!("{err}");
+        process::exit(1);
+    });
+
+    let offset = offset_str
+        .parse::<u64>()
+        .expect("Offset should be an integer.");
+
+    let f = File::open(fpath)?;
+
+    let buf = scan_from_file(f, offset)?;
+
     let x = vec_to_int(buf);
+
     println!("{x:?}");
 
     Ok(())
