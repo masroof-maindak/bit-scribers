@@ -14,7 +14,7 @@ cargo build -r
 ## TODOs
 
 - [x] Basic, working implementation
-- [ ] Convert to library
+- [x] Convert to library
 - [ ] Encoding support
 
 ## Caveats
